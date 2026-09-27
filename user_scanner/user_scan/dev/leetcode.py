@@ -34,7 +34,7 @@ def validate_leetcode(user: str) -> Result:
                 return Result.available(url=show_url)
 
             matched_user = data.get("data", {}).get("matchedUser")
-            if matched_user:
+            if isinstance(matched_user, dict) and matched_user.get("username", "").lower() == user.lower():
                 extra = {}
                 media = {}
                 profile = matched_user.get("profile", {})
@@ -49,7 +49,10 @@ def validate_leetcode(user: str) -> Result:
 
                 return Result.taken(extra=extra, media=media, url=show_url)
 
-            return Result.available(url=show_url)
+            return Result.error(
+                "LeetCode returned 200 without an explicit account match",
+                url=show_url,
+            )
         else:
             return Result.error(f"Unexpected status: {response.status_code}", url=show_url)
     except Exception as e:

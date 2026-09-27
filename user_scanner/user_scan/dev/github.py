@@ -16,6 +16,9 @@ def validate_github(user):
         api_response = make_request(api_url, headers=headers, follow_redirects=True)
         if api_response.status_code == 200:
             data = api_response.json()
+            if not isinstance(data, dict) or data.get("login", "").lower() != user.lower():
+                return Result.error("GitHub API response did not verify the requested username", url=show_url)
+
             extra = {}
             media = {}
             if name := data.get("name"): extra["name"] = name
@@ -77,6 +80,17 @@ def validate_github(user):
         if response.status_code == 404:
             return Result.available(url=show_url)
         elif response.status_code == 200:
+            # A generic GitHub HTML page (login, error, challenge, etc.) is not
+            # proof that the requested profile exists. Require the page to carry
+            # the requested canonical profile URL.
+            canonical_match = local_re.search(
+                r'<link[^>]+rel="canonical"[^>]+href="https://github\.com/([^"/?]+)"',
+                response.text,
+                local_re.IGNORECASE,
+            )
+            if not canonical_match or canonical_match.group(1).lower() != user.lower():
+                return Result.error("GitHub HTML response did not verify the requested username", url=show_url)
+
             extra = {}
             media = {}
             try:
