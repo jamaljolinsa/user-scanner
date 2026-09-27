@@ -33,8 +33,14 @@ async def _check(email: str) -> Result:
                 data = response.json()
                 err = str(data.get("error", "")).lower()
                 err_text = str(data.get("error_text", "")).lower()
+
+                # CAPTCHA/WAF challenges prevent verification; they are not
+                # evidence that the target email is registered.
                 if "nocaptcha" in err or "captcha" in err_text:
-                    return Result.taken(url=show_url)
+                    return Result.error(
+                        "CAPTCHA challenge prevented account verification",
+                        url=show_url,
+                    )
 
             if response.status_code == 400:
                 data = response.json()
