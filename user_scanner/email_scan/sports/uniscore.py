@@ -1,6 +1,7 @@
 import httpx
 from user_scanner.core.result import Result
 
+
 async def _check(email: str) -> Result:
     # Target endpoint for password recovery checks
     url = "https://api.unik8s.com/api/v2/account/auth/forgot-password?language=en"
@@ -10,7 +11,7 @@ async def _check(email: str) -> Result:
         'User-Agent': "okhttp/4.12.0",
         'Accept': "application/json, text/plain, */*",
         'Accept-Encoding': "gzip",
-        'Content-Type': "application/json",
+        'Content-Type': "application/json',
         'app-version': "1.8.5",
         'customer-id': "",
         'user-id': "",
@@ -45,24 +46,33 @@ async def _check(email: str) -> Result:
             except Exception:
                 data = {}
 
-            # 200 OK -> Target email is registered in the DB
+            # Do not infer registration from HTTP 200 alone. The endpoint may
+            # return a successful transport response without an account match.
             if response.status_code == 200:
-                return Result.taken(url=show_url)
+                return Result.error(
+                    "Unverified recovery response; account registration could not be confirmed",
+                    url=show_url,
+                )
 
-            # 404 Not Found -> Account is available
             if response.status_code == 404:
-                # Secondary validation: Enforce checking the JSON payload message structure
-                error_msg = data.get("message", "").lower()
+                error_msg = data.get("message", "").lower() if isinstance(data, dict) else ""
 
                 if "this email hasn't been registered to an account" in error_msg:
                     return Result.available(url=show_url)
 
-                return Result.error("404 status received but payload body failed verification signature")
+                return Result.error(
+                    "404 status received but payload body failed verification signature",
+                    url=show_url,
+                )
 
-            return Result.error(f"Gateway returned unhandled status profile (HTTP {response.status_code})")
+            return Result.error(
+                f"Gateway returned unhandled status profile (HTTP {response.status_code})",
+                url=show_url,
+            )
 
     except Exception as e:
-        return Result.error(str(e))
+        return Result.error(str(e), url=show_url)
+
 
 async def validate_uniscore(email: str) -> Result:
     return await _check(email)
