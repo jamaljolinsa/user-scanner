@@ -11,7 +11,7 @@ async def _check(email: str) -> Result:
         'User-Agent': "okhttp/4.12.0",
         'Accept': "application/json, text/plain, */*",
         'Accept-Encoding': "gzip",
-        'Content-Type': "application/json',
+        'Content-Type': "application/json",
         'app-version': "1.8.5",
         'customer-id': "",
         'user-id': "",
