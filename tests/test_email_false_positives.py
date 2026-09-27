@@ -1,4 +1,3 @@
-import types
 import pytest
 
 from user_scanner.core.result import Status
