@@ -260,11 +260,12 @@ class Result:
         color = self.get_output_color()
         icon = self.get_output_icon()
 
-        # Added logic to include URL in console output if show_url is True
-        ## Color the URL in white for better visibility
+        # Show a verified module URL whenever one is available. This makes
+        # successful username/email matches directly actionable without requiring
+        # the user to remember the -v flag.
         url_display = (
             f" {Fore.WHITE}[{self.url}]{color}"
-            if (configs and configs.verbose) and self.url
+            if self.url
             else ""
         )
 
