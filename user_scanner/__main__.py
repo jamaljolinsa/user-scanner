@@ -59,6 +59,27 @@ X = Fore.RESET
 
 MAX_PERMUTATIONS_LIMIT = 100
 
+IRANIAN_TARGET_MODULES = {
+    "imo": {"user": (), "email": ()},
+    "snapchat": {"user": ("snapchat",), "email": ()},
+    "signal": {"user": ("signalusers",), "email": ()},
+    "instagram": {"user": ("instagram",), "email": ("instagram",)},
+    "facebook": {"user": ("facebook",), "email": ("facebook",)},
+    "x": {"user": ("x",), "email": ("x",)},
+    "email": {"user": (), "email": ()},
+    "microsoft": {"user": (), "email": ("office365",)},
+    "tiktok": {"user": ("tiktok",), "email": ()},
+    "linkedin": {"user": ("linkedin",), "email": ()},
+    "whatsapp": {"user": (), "email": ()},
+}
+
+IRANIAN_TARGET_LABELS = (
+    ("imo", "IMO"), ("snapchat", "Snapchat"), ("signal", "Signal"),
+    ("instagram", "Instagram"), ("facebook", "Facebook"), ("x", "X (Twitter)"),
+    ("email", "Email"), ("microsoft", "Microsoft"), ("tiktok", "TikTok"),
+    ("linkedin", "LinkedIn"), ("whatsapp", "WhatsApp"),
+)
+
 
 def _csv_names(value) -> tuple:
     """Split a repeatable, comma-separated -m/-c value into names."""
@@ -496,6 +517,23 @@ def main():
         target_name = args.username or args.email
         targets_found = [target_name]
 
+    # Ask for the target region before any network scan.
+    target_region = None
+    if not args.hudson_scan:
+        print(f"\n{Fore.CYAN}Target region:{Style.RESET_ALL}")
+        print("  1) Iranian")
+        print("  2) Foreign")
+        while target_region not in {"iranian", "foreign"}:
+            choice = input(f"{Fore.YELLOW}Select [1/2]: {Style.RESET_ALL}").strip().lower()
+            if choice in {"1", "iran", "iranian"}:
+                target_region = "iranian"
+            elif choice in {"2", "foreign", "non-iranian"}:
+                target_region = "foreign"
+            else:
+                print(f"{Y}[!] Please enter 1 for Iranian or 2 for Foreign.{X}")
+        if target_region == "iranian" and (args.module or args.category):
+            print(f"{Y}[i] Iranian mode ignores -m/--module and -c/--category and uses the curated Iranian module list.{X}")
+
     # Handle permutations (only for single username/email)
 
     targets = []
@@ -551,6 +589,27 @@ def main():
     validated_modules = []
     validated_categories = []
 
+    if target_region == "iranian":
+        scan_kind = "email" if is_email else "user"
+        missing_services = []
+        for service_key, service_label in IRANIAN_TARGET_LABELS:
+            module_names = IRANIAN_TARGET_MODULES[service_key][scan_kind]
+            if not module_names:
+                missing_services.append(service_label)
+                continue
+            service_found = []
+            for module_name in module_names:
+                service_found.extend(find_module(module_name, is_email, args.no_nsfw))
+            if service_found:
+                validated_modules.extend(service_found)
+            else:
+                missing_services.append(service_label)
+        if missing_services:
+            print(f"{Y}[i] No compatible module in this build for: {", ".join(missing_services)}{X}")
+        if not validated_modules:
+            print(f"{R}[✘] No compatible Iranian-target modules are available for this input type.{X}")
+            sys.exit(1)
+
     if args.hudson_scan:
         if args.cross_scan:
             print(f"{R}[✘] Error: --cross-scan cannot be used with --hudson {X}")
@@ -560,7 +619,7 @@ def main():
             print(f"{Y}[i] Use it independently{X}")
             sys.exit(1)
     else:
-        if args.module:
+        if args.module and target_region != "iranian":
             raw_module_str = ",".join(args.module) if isinstance(args.module, list) else args.module
             requested_modules = [m.strip() for m in raw_module_str.split(",") if m.strip()]
             
@@ -614,7 +673,7 @@ def main():
             continue
 
 
-        if args.module:
+        if args.module or target_region == "iranian":
             fn = run_email_module_batch if is_email else run_user_module
             modules_to_run = []
             for module in validated_modules:
