@@ -18,31 +18,33 @@ async def _check(email: str) -> Result:
 
     try:
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=False) as client:
-
             r = await client.get(
                 f"{base_url}/{email}?Protocol=Autodiscoverv1",
                 headers=headers,
             )
 
         if r.status_code == 403:
-            return Result.error("Caught by WAF or IP Block (403)")
+            return Result.error("Caught by WAF or IP Block (403)", url=show_url)
 
         if r.status_code == 429:
-            return Result.error("Rate limited (429)")
+            return Result.error("Rate limited (429)", url=show_url)
 
-        if r.status_code == 200:
-            return Result.taken(url=show_url)
-
-        return Result.available(url=show_url)
+        # A successful Autodiscover HTTP response is not, by itself, proof that
+        # the mailbox exists. Treat unvalidated responses as unknown/error
+        # instead of turning every 200 (or every other status) into a verdict.
+        return Result.error(
+            f"Could not verify Office 365 mailbox registration (HTTP {r.status_code})",
+            url=show_url,
+        )
 
     except httpx.ConnectTimeout:
-        return Result.error("Connection timed out")
+        return Result.error("Connection timed out", url=show_url)
 
     except httpx.ReadTimeout:
-        return Result.error("Server took too long to respond")
+        return Result.error("Server took too long to respond", url=show_url)
 
     except Exception as e:
-        return Result.error(e)
+        return Result.error(e, url=show_url)
 
 
 async def validate_office365(email: str) -> Result:
